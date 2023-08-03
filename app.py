@@ -22,11 +22,21 @@ def convert_and_compile(input_file):
 
     # Generate a new .tex file
     with open(latex_file, "w") as f:
-        f.write("\\documentclass[12pt]{article}\n")
+        f.write("\\documentclass[12pt]{standalone}\n")
         f.write("\\input{etc/cmd}\n")
+        f.write("\\usepackage[utf8]{inputenc}\n")
+        f.write("\\usepackage{amsmath}\n")
+        f.write("\\usepackage{amssymb}\n")
+        f.write("\\usepackage{hyperref}\n")
+        f.write("\\usepackage{varwidth}\n")
+        f.write("\\usepackage{adjustbox}\n")
         f.write("\\begin{document}\n")
+        f.write("\\begin{adjustbox}{margin=5mm}\n")
+        f.write("\\begin{varwidth}{\\linewidth}\n")
         f.write(content)
-        f.write("\n\\end{document}")
+        f.write("\n\\end{varwidth}\n")
+        f.write("\\end{adjustbox}\n")
+        f.write("\\end{document}")
 
     # Compile LaTeX to PDF with XeLaTeX
     subprocess.run(["xelatex", "-interaction=nonstopmode", latex_file], check=True)
