@@ -5,11 +5,13 @@ from PIL import Image
 import re
 import shutil
 
+
 def replace_persian_numbers(text):
-    persian_numbers = '۰۱۲۳۴۵۶۷۸۹'
-    english_numbers = '0123456789'
+    persian_numbers = "۰۱۲۳۴۵۶۷۸۹"
+    english_numbers = "0123456789"
     translation_table = str.maketrans(persian_numbers, english_numbers)
     return text.translate(translation_table)
+
 
 def wrap_numbers_in_math_mode(text):
     in_math_mode = False
@@ -21,21 +23,25 @@ def wrap_numbers_in_math_mode(text):
         current_char = text[i]
         next_char = text[i + 1] if i + 1 < len(text) else None
 
-        if current_char == '\\' and next_char in ['(', ')']:
+        if current_char == "\\" and next_char in ["(", ")"]:
             result.append(current_chunk)
             current_chunk = current_char + next_char
             in_math_mode = not in_math_mode
             i += 2
             continue
 
-        if current_char == '$':
+        if current_char == "$":
             result.append(current_chunk)
             current_chunk = current_char
             in_math_mode = not in_math_mode
             i += 1
             continue
 
-        if not in_math_mode and current_char.isdigit() and not (text[i - 1].isdigit() or (next_char and next_char.isdigit())):
+        if (
+            not in_math_mode
+            and current_char.isdigit()
+            and not (text[i - 1].isdigit() or (next_char and next_char.isdigit()))
+        ):
             result.append(current_chunk)
             current_chunk = f"${current_char}$"
             i += 1
@@ -46,39 +52,44 @@ def wrap_numbers_in_math_mode(text):
 
     result.append(current_chunk)
 
-    return ''.join(result)
+    return "".join(result)
 
 
+# Define the helper functions
+def separate_text_equations(text):
+    text = re.sub(r"\\\(", "\n\\(", text)
+    text = re.sub(r"\\\)", "\\)\n", text)
+    return text
 
-def convert_and_compile(input_file, output_file):
+
+def remove_unnecessary_latex_commands(text):
+    lines = text.split("\n")
+    for i in range(len(lines)):
+        line = lines[i]
+        if "\\RL" in line:
+            line = re.sub(r"\\RL\{([^}]*)\}", r"\1", line)
+        if "\\text" in line:
+            line = re.sub(r"\\text\{([^}]*)\}", r"\1", line)
+        lines[i] = line
+    return "\n".join(lines).strip()
+
+
+def convert_and_compile(input_file, output_file, latex_output_file=None):
     docx_file = input_file
     latex_file = "output.tex"
     pdf_file = "output.pdf"
 
-
-    # Define the helper functions
-    def separate_text_equations(text):
-        text = re.sub(r"\\\(", "\n\\(", text)
-        text = re.sub(r"\\\)", "\\)\n", text)
-        return text
-
-    def remove_unnecessary_latex_commands(text):
-        lines = text.split("\n")
-        for i in range(len(lines)):
-            line = lines[i]
-            if "\\RL" in line:
-                line = re.sub(r"\\RL\{([^}]*)\}", r"\1", line)
-            if "\\text" in line:
-                line = re.sub(r"\\text\{([^}]*)\}", r"\1", line)
-            lines[i] = line
-        return "\n".join(lines).strip()
-
-
     # Convert .docx to .md
-    subprocess.run(["pandoc", "-s", docx_file, "-t", "markdown", "-o", "intermediate.md"], check=True)
+    subprocess.run(
+        ["pandoc", "-s", docx_file, "-t", "markdown", "-o", "intermediate.md"],
+        check=True,
+    )
 
     # Convert .md to .tex
-    subprocess.run(["pandoc", "-s", "intermediate.md", "-t", "latex", "-o", "intermediate.tex"], check=True)
+    subprocess.run(
+        ["pandoc", "-s", "intermediate.md", "-t", "latex", "-o", "intermediate.tex"],
+        check=True,
+    )
 
     # Extract content between \begin{document} and \end{document}
     with open("intermediate.tex", "r") as f:
@@ -86,10 +97,10 @@ def convert_and_compile(input_file, output_file):
     content = re.search(
         r"\\begin\{document\}([\s\S]*)\\end\{document\}", content
     ).group(1)
-    
+
     # Replace Persian numbers with English numbers
     content = replace_persian_numbers(content)
-    
+
     # Wrap numbers in math mode
     content = wrap_numbers_in_math_mode(content)
 
@@ -118,6 +129,10 @@ def convert_and_compile(input_file, output_file):
     # Compile LaTeX to PDF with XeLaTeX
     subprocess.run(["xelatex", "-interaction=nonstopmode", latex_file], check=True)
 
+    # If a LaTeX output file path is provided, copy the generated LaTeX file
+    if latex_output_file:
+        shutil.copy(latex_file, latex_output_file)
+
     # Convert PDF to JPEG with pdftoppm
     subprocess.run(["pdftoppm", "-jpeg", "-singlefile", pdf_file, "temp"], check=True)
 
@@ -138,11 +153,12 @@ def convert_all_files(input_directory, output_directory):
             base_name = os.path.basename(docx_file)
             output_name = os.path.splitext(base_name)[0]
             jpeg_file = os.path.join(output_directory, output_name + ".jpeg")
+            latex_file = os.path.join(output_directory, output_name + ".tex")
 
             # Convert and compile the document
-            convert_and_compile(docx_file, jpeg_file)
+            convert_and_compile(docx_file, jpeg_file, latex_file)
 
-            print(f"Successfully converted {docx_file} to {jpeg_file}")
+            print(f"Successfully converted {docx_file} to {jpeg_file} and {latex_file}")
 
         except Exception as e:
             print(f"Failed to convert {docx_file}. Error: {e}")

@@ -75,3 +75,4 @@ iface = gr.Interface(
 )
 
 iface.launch(debug=True, share=True, server_name="tehran.emma-jewellery.ir", server_port=21401, ssl_certfile="/root/cert.crt",  ssl_keyfile="/root/private.key")
+# iface.launch(debug=True, share=True)
